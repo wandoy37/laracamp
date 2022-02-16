@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use App\Models\checkout;
+use App\Models\Checkout;
 use Illuminate\Http\Request;
 use App\Http\Requests\User\Checkout\Store;
+use App\Mail\Checkout\AfterCheckout;
 use App\Models\Camp;
 use Auth;
 use Mail;
-use App\Mail\Checkout\AfterCheckout;
 use Str;
 use Midtrans;
 
@@ -56,25 +56,27 @@ class CheckoutController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Store $request, camp $camp)
+    public function store(Store $request, Camp $camp)
     {
-        // Mapping request data
+        // mapping request data
         $data = $request->all();
         $data['user_id'] = Auth::id();
         $data['camp_id'] = $camp->id;
 
-        // Update user data
+        // update user data
         $user = Auth::user();
         $user->email = $data['email'];
         $user->name = $data['name'];
         $user->occupation = $data['occupation'];
+        $user->phone = $data['phone'];
+        $user->address = $data['address'];
         $user->save();
 
         // create checkout
         $checkout = Checkout::create($data);
         $this->getSnapRedirect($checkout);
 
-        // Sending email
+        // sending email
         Mail::to(Auth::user()->email)->send(new AfterCheckout($checkout));
 
         return redirect(route('checkout.success'));
@@ -83,10 +85,10 @@ class CheckoutController extends Controller
     /**
      * Display the specified resource.
      *
-     * @param  \App\Models\checkout  $checkout
+     * @param  \App\Models\Checkout  $checkout
      * @return \Illuminate\Http\Response
      */
-    public function show(checkout $checkout)
+    public function show(Checkout $checkout)
     {
         //
     }
@@ -94,10 +96,10 @@ class CheckoutController extends Controller
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  \App\Models\checkout  $checkout
+     * @param  \App\Models\Checkout  $checkout
      * @return \Illuminate\Http\Response
      */
-    public function edit(checkout $checkout)
+    public function edit(Checkout $checkout)
     {
         //
     }
@@ -106,10 +108,10 @@ class CheckoutController extends Controller
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\checkout  $checkout
+     * @param  \App\Models\Checkout  $checkout
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, checkout $checkout)
+    public function update(Request $request, Checkout $checkout)
     {
         //
     }
@@ -117,10 +119,10 @@ class CheckoutController extends Controller
     /**
      * Remove the specified resource from storage.
      *
-     * @param  \App\Models\checkout  $checkout
+     * @param  \App\Models\Checkout  $checkout
      * @return \Illuminate\Http\Response
      */
-    public function destroy(checkout $checkout)
+    public function destroy(Checkout $checkout)
     {
         //
     }
@@ -130,11 +132,14 @@ class CheckoutController extends Controller
         return view('checkout.success');
     }
 
-    // Midtrans Handler
+    /**
+     * Midtrans Handler
+     */
     public function getSnapRedirect(Checkout $checkout)
     {
         $orderId = $checkout->id . '-' . Str::random(5);
         $price = $checkout->Camp->price * 1000;
+
         $checkout->midtrans_booking_code = $orderId;
 
         $transaction_details = [
@@ -146,7 +151,7 @@ class CheckoutController extends Controller
             'id' => $orderId,
             'price' => $price,
             'quantity' => 1,
-            'name' => "Payment for {$chackout->Camp->title} Camp"
+            'name' => "Payment for {$checkout->Camp->title} Camp"
         ];
 
         $userData = [
